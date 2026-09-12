@@ -18,7 +18,8 @@ cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-codesign --force --deep --sign - "$APP"
+# Stable bundle id in the signature so Privacy → Accessibility can match the same app entry.
+codesign --force --deep --sign - --identifier "com.icopy.app" "$APP"
 
 BYTES="$(stat -f %z "$APP/Contents/MacOS/iCopy")"
 echo "Built $APP (${BYTES} bytes binary)"

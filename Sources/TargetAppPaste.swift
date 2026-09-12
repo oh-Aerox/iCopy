@@ -25,10 +25,11 @@ enum TargetAppPaste {
             return
         }
 
-        // Key synthesis is rejected unless the user has granted Accessibility to this process.
-        if !AccessibilityTrust.ensurePrompted() {
+        // Clipboard is already restored by the caller; Accessibility is only needed for ⌘V.
+        if !AccessibilityTrust.canSynthesizeKeys() {
             AppLog.error("paste.blocked_no_accessibility", [
                 "app": target.bundleIdentifier ?? "",
+                "prompted": String(AccessibilityTrust.didPromptThisLaunch),
             ])
             return
         }
@@ -66,14 +67,75 @@ enum TargetAppPaste {
     }
 }
 
+/// Accessibility grants stick to the signed binary. Re-prompting with prompt:true on every paste
+/// reopens the system sheet whenever the current process is still untrusted (common until relaunch).
 enum AccessibilityTrust {
-    static func ensurePrompted() -> Bool {
-        if AXIsProcessTrusted() {
+    private(set) static var didPromptThisLaunch = false
+    private static var didShowGuideAlert = false
+
+    static var isTrusted: Bool {
+        AXIsProcessTrusted()
+    }
+
+    /// Returns whether key synthesis is allowed. Shows the OS prompt at most once per launch.
+    static func canSynthesizeKeys() -> Bool {
+        if isTrusted {
             return true
         }
-        let prompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let trusted = AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)
-        AppLog.info("paste.accessibility_check", ["trusted": String(trusted)])
+
+        if !didPromptThisLaunch {
+            didPromptThisLaunch = true
+            let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+            // prompt:true only on the first denial — later pastes must not call this again.
+            let trustedNow = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+            AppLog.info("paste.accessibility_prompt", ["trusted": String(trustedNow)])
+            if trustedNow {
+                return true
+            }
+            openAccessibilitySettings()
+            showEnableGuideIfNeeded()
+            return false
+        }
+
+        // User may have toggled the switch without quitting; re-check quietly, never re-prompt.
+        let trusted = isTrusted
+        AppLog.info("paste.accessibility_recheck", ["trusted": String(trusted)])
+        if !trusted {
+            showEnableGuideIfNeeded()
+        }
         return trusted
     }
+
+    private static func openAccessibilitySettings() {
+        for raw in AccessibilitySettingsURL.candidates {
+            if let url = URL(string: raw), NSWorkspace.shared.open(url) {
+                AppLog.info("paste.accessibility_settings_opened", ["url": raw])
+                return
+            }
+        }
+        AppLog.error("paste.accessibility_settings_failed")
+    }
+
+    private static func showEnableGuideIfNeeded() {
+        guard !didShowGuideAlert else { return }
+        didShowGuideAlert = true
+        let alert = NSAlert()
+        alert.messageText = L10n.accessibilityTitle
+        alert.informativeText = L10n.accessibilityBody
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: L10n.accessibilityOpenSettings)
+        alert.addButton(withTitle: L10n.accessibilityLater)
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            openAccessibilitySettings()
+        }
+    }
+}
+
+enum AccessibilitySettingsURL {
+    /// Prefer newer Settings deep links; fall back to the legacy Security pane.
+    static let candidates = [
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+        "x-apple.systempreferences:com.apple.Settings.PrivacySecurity.extension?Privacy_Accessibility",
+    ]
 }

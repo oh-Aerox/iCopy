@@ -104,6 +104,25 @@ enum L10n {
         pick(zh: "iCopy 剪贴板", en: "iCopy clipboard")
     }
 
+    static var accessibilityTitle: String {
+        pick(zh: "需要「辅助功能」权限", en: "Accessibility permission required")
+    }
+
+    static var accessibilityBody: String {
+        pick(
+            zh: "已将内容写入剪贴板。请在「系统设置 → 隐私与安全性 → 辅助功能」中打开 iCopy，然后完全退出并重新打开本应用，之后点击方块即可自动粘贴。",
+            en: "The clip is already on the clipboard. Enable iCopy under System Settings → Privacy & Security → Accessibility, then quit and reopen this app so tile clicks can paste automatically."
+        )
+    }
+
+    static var accessibilityOpenSettings: String {
+        pick(zh: "打开设置", en: "Open Settings")
+    }
+
+    static var accessibilityLater: String {
+        pick(zh: "稍后", en: "Later")
+    }
+
     static func relativeTime(from date: Date, now: Date = Date()) -> String {
         let elapsed = now.timeIntervalSince(date)
         let minute: TimeInterval = 60
