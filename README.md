@@ -11,6 +11,10 @@
 
 首次自动粘贴时，系统会请求「辅助功能」权限：在列表中打开 **iCopy** 后，请从菜单栏退出并重新打开应用，之后不会再反复弹窗。若只打开开关却不重启，系统仍会认为当前进程未授权。
 
+> 「辅助功能」授权与 App 的代码签名绑定。若用 ad-hoc（临时）签名，每次 `build.sh` 都会改变签名指纹，导致上次的授权失效、自动粘贴被静默拦截（日志 `paste.blocked_no_accessibility`）。因此 `build.sh` 会优先使用稳定的签名身份：自动选用 Keychain 里的 Apple Development 证书，或通过 `ICOPY_SIGN_IDENTITY` 环境变量指定。只有在找不到任何证书时才回退到 ad-hoc。用稳定身份签名后，授权可在多次重编后保留。
+>
+> 如果之前用 ad-hoc 装过、导致授权卡在「开关是开的但仍不生效」，先执行 `tccutil reset Accessibility com.icopy.app` 清掉旧记录，再重新授权并重启应用。
+
 ## 生成 DMG
 
 需要 macOS 自带的 `hdiutil`，以及已安装的 Swift 命令行工具。只打 arm64（Apple Silicon）。
